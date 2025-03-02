@@ -58,7 +58,7 @@ Main dependencies include:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/pienews.git
+git clone https://github.com/jasen215/pienews.git
 cd pienews
 ```
 

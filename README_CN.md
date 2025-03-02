@@ -2,7 +2,6 @@
 
 [English](README.md)
 
-
 PieNews 是一个使用 Flutter 开发的 RSS 阅读器客户端，基于 The Old Reader 服务。它提供了一个现代化、用户友好的界面来阅读和管理你的 RSS 订阅。
 
 ## 功能特点
@@ -27,6 +26,7 @@ PieNews 是一个使用 Flutter 开发的 RSS 阅读器客户端，基于 The Ol
 ## 依赖项
 
 主要依赖包括：
+
 - provider: ^6.0.5 (状态管理)
 - http: ^1.1.0 (网络请求)
 - shared_preferences: ^2.2.1 (本地存储)
@@ -46,17 +46,20 @@ PieNews 是一个使用 Flutter 开发的 RSS 阅读器客户端，基于 The Ol
 ### 安装步骤
 
 1. 克隆项目代码：
+
 ```bash
-git clone https://github.com/yourusername/pienews.git
+git clone https://github.com/jasen215/pienews.git
 cd pienews
 ```
 
 2. 安装依赖：
+
 ```bash
 flutter pub get
 ```
 
 3. 运行项目：
+
 ```bash
 flutter run
 ```
@@ -64,21 +67,25 @@ flutter run
 ## 构建发布版本
 
 ### Android
+
 ```bash
 flutter build apk --release
 ```
 
 ### iOS
+
 ```bash
 flutter build ios --release
 ```
 
 ### Web
+
 ```bash
 flutter build web --release
 ```
 
 ### Desktop (Windows/macOS/Linux)
+
 ```bash
 flutter build <platform> --release
 ```
