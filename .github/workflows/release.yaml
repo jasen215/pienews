@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release"
+        required: true
+        type: string
+
+env:
+  FLUTTER_VERSION: "3.24.5"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+  build-android:
+    needs: prepare
+    uses: ./.github/workflows/deps-build-android.yaml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  build-ios:
+    needs: prepare
+    if: false # Disabled temporarily
+    uses: ./.github/workflows/deps-build-ios.yaml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  build-linux:
+    needs: prepare
+    uses: ./.github/workflows/deps-build-linux.yaml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  build-macos:
+    needs: prepare
+    uses: ./.github/workflows/deps-build-macos.yaml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  build-windows:
+    needs: prepare
+    uses: ./.github/workflows/deps-build-windows.yaml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  create-release:
+    needs: [
+        prepare,
+        build-android,
+        # build-ios,
+        build-linux,
+        build-macos,
+        build-windows,
+      ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Rename checksums
+        run: |
+          for platform in Android Linux MacOS Windows; do
+            platform_lower=$(echo $platform | tr '[:upper:]' '[:lower:]')
+            if [ -f "release-${platform_lower}/checksums.txt" ]; then
+              mv "release-${platform_lower}/checksums.txt" "release-${platform_lower}/PieNews-${{ needs.prepare.outputs.version }}-${platform}-checksums.txt"
+            fi
+          done
+
+      - name: Generate latest.json
+        run: |
+          cat > latest.json << EOF
+          {
+            "version": "${{ needs.prepare.outputs.version }}",
+            "notes": "See the assets to download and install this version.",
+            "pub_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "platforms": {
+              "android-arm64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Android-arm64.apk"
+              },
+              "android-arm7": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Android-arm7.apk"
+              },
+              "android-x64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Android-x86_64.apk"
+              },
+              "android-universal": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Android-universal.apk"
+              },
+              "linux-deb": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Linux-x64.deb"
+              },
+              "linux-rpm": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Linux-x64.rpm"
+              },
+              "linux-appimage": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Linux-x64.AppImage"
+              },
+              "macos-dmg": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-MacOS.dmg"
+              },
+              "macos-portable": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-MacOS.tar.gz"
+              },
+              "windows-setup": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Windows-Setup-x64.exe"
+              },
+              "windows-portable": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Windows-Portable-x64.zip"
+              },
+              "windows-msix": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/PieNews-${{ needs.prepare.outputs.version }}-Windows-Setup-x64.Msix"
+              }
+            }
+          }
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: PieNews v${{ needs.prepare.outputs.version }}
+          files: |
+            release-android/PieNews-*-Android-*.apk
+            release-android/PieNews-*-Android.aab
+            release-android/PieNews-*-Android-checksums.txt
+            # release-ios/PieNews-*-iOS.ipa
+            # release-ios/PieNews-*-iOS-checksums.txt
+            release-linux/PieNews-*-Linux-x64.deb
+            release-linux/PieNews-*-Linux-x64.rpm
+            release-linux/PieNews-*-Linux-x64.AppImage
+            release-linux/PieNews-*-Linux-checksums.txt
+            release-macos/PieNews-*-MacOS.dmg
+            release-macos/PieNews-*-MacOS-checksums.txt
+            release-windows/PieNews-*-Windows-Setup-x64.exe
+            release-windows/PieNews-*-Windows-Portable-x64.zip
+            release-windows/PieNews-*-Windows-Setup-x64.Msix
+            release-windows/PieNews-*-Windows-checksums.txt
+            latest.json
+          draft: true
+          generate_release_notes: true

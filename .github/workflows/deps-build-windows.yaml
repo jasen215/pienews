@@ -1,0 +1,103 @@
+name: Build Windows
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows
+        run: flutter build windows --release
+
+      - name: Check build output
+        shell: pwsh
+        run: |
+          $buildPath = "build\windows\x64\runner\Release"
+          if (-not (Test-Path $buildPath)) {
+            Write-Error "构建目录不存在，请确保 Flutter 构建已完成"
+            exit 1
+          }
+
+      - name: Create portable package
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $portablePath = "release-windows\PieNews-${version}-Windows-Portable-x64"
+
+          New-Item -ItemType Directory -Path "release-windows" -Force
+          New-Item -ItemType Directory -Path $portablePath -Force
+
+          Copy-Item "build\windows\x64\runner\Release\*" -Destination $portablePath -Recurse
+
+          Compress-Archive -Path $portablePath -DestinationPath "release-windows\PieNews-${version}-Windows-Portable-x64.zip"
+
+      - name: Create installer
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $installerPath = "release-windows\PieNews-${version}-Windows-Setup-x64.exe"
+
+          # Create installer using Inno Setup
+          iscc /DMyAppVersion=$version `
+               /DMyAppExeName=pienews.exe `
+               /DMyAppId=com.example.pienews `
+               /DMyAppName=PieNews `
+               /DMyAppPublisher="PieNews Team" `
+               /DMyAppURL=https://github.com/jasen/pienews `
+               /DMyAppExeDir=build\windows\x64\runner\Release `
+               /F"PieNews-${version}-Windows-Setup-x64" `
+               /O"release-windows" `
+               packaging\windows\installer.iss
+
+      - name: Create MSIX package
+        shell: pwsh
+        run: >
+          $version = "${{ inputs.version }}";
+          $buildPath = "build\windows\x64\runner\Release";
+          $msixPath = "release-windows";
+          New-Item -ItemType Directory -Force -Path "$msixPath\AppX";
+          New-Item -ItemType Directory -Force -Path "$msixPath\AppX\assets";
+          Copy-Item "$buildPath\*" -Destination "$msixPath\AppX" -Recurse -Force;
+          Copy-Item "assets\icons\app_icon.png" -Destination "$msixPath\AppX\assets\StoreLogo.png" -Force;
+          Copy-Item "assets\icons\app_icon.png" -Destination "$msixPath\AppX\assets\Square150x150Logo.png" -Force;
+          Copy-Item "assets\icons\app_icon.png" -Destination "$msixPath\AppX\assets\Square44x44Logo.png" -Force;
+          $manifestContent = "<?xml version=`"1.0`" encoding=`"utf-8`"?><Package xmlns=`"http://schemas.microsoft.com/appx/manifest/foundation/windows10`" xmlns:uap=`"http://schemas.microsoft.com/appx/manifest/uap/windows10`" xmlns:rescap=`"http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities`"><Identity Name=`"PieNews`" Publisher=`"CN=PieNews Team`" Version=`"$version.0`" ProcessorArchitecture=`"x64`" /><Properties><DisplayName>PieNews</DisplayName><PublisherDisplayName>PieNews Team</PublisherDisplayName><Logo>assets\StoreLogo.png</Logo></Properties><Dependencies><TargetDeviceFamily Name=`"Windows.Desktop`" MinVersion=`"10.0.17763.0`" MaxVersionTested=`"10.0.19041.0`" /></Dependencies><Resources><Resource Language=`"x-generate`" /></Resources><Applications><Application Id=`"PieNews`" Executable=`"pienews.exe`" EntryPoint=`"Windows.FullTrustApplication`"><uap:VisualElements DisplayName=`"PieNews`" Description=`"A modern RSS reader built with Flutter`" BackgroundColor=`"transparent`" Square150x150Logo=`"assets\Square150x150Logo.png`" Square44x44Logo=`"assets\Square44x44Logo.png`" /></Application></Applications><Capabilities><rescap:Capability Name=`"runFullTrust`" /><Capability Name=`"internetClient`" /></Capabilities></Package>";
+          $manifestContent | Set-Content "$msixPath\AppX\AppxManifest.xml" -Encoding UTF8;
+          $env:PATH += ";${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.19041.0\x64";
+          & MakeAppx.exe pack /d "$msixPath\AppX" /p "$msixPath\PieNews-${version}-Windows-Setup-x64.Msix"
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          Set-Location release-windows
+          Get-ChildItem -File | ForEach-Object {
+            $hash = Get-FileHash -Path $_.Name -Algorithm SHA256
+            "$($hash.Hash.ToLower())  $($_.Name)" | Add-Content checksums.txt
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: release-windows/

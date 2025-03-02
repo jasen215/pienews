@@ -1,0 +1,50 @@
+name: pienews
+description: A Flutter RSS reader client using The Old Reader
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.0.5
+  http: ^1.1.0
+  shared_preferences: ^2.5.2
+  url_launcher: ^6.1.14
+  intl: ^0.19.0
+  html: ^0.15.4
+  cached_network_image: ^3.3.0
+  flutter_html: ^3.0.0-beta.2
+  flutter_widget_from_html_core: ^0.15.2
+  flutter_widget_from_html: ^0.15.3
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  package_info_plus: ^4.0.0
+  share_plus: ^7.2.1
+  flutter_localizations:
+    sdk: flutter
+  photo_view: ^0.14.0
+  synchronized: ^3.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^2.0.3
+  flutter_launcher_icons: ^0.14.1
+  sqflite_common_ffi: ^2.3.4+4
+  mockito: ^5.4.4
+  build_runner: ^2.4.8
+  test: ^1.24.9
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/images/
+    - assets/icons/
+flutter_intl:
+  enabled: true

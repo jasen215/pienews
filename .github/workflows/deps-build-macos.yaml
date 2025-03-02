@@ -1,0 +1,83 @@
+name: Build macOS Dependencies
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Enable macOS
+        run: flutter config --enable-macos-desktop
+
+      - name: Build macOS
+        run: flutter build macos --release
+
+      - name: Create DMG
+        run: |
+          cd build/macos/Build/Products/Release
+          create-dmg \
+            --volname "PieNews" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "pienews.app" 200 190 \
+            --hide-extension "pienews.app" \
+            --app-drop-link 600 185 \
+            "PieNews-${{ inputs.version }}-MacOS.dmg" \
+            "pienews.app"
+
+      - name: Create portable archive
+        run: |
+          cd build/macos/Build/Products/Release
+          tar -czf "PieNews-${{ inputs.version }}-MacOS.tar.gz" pienews.app
+
+      - name: Import GPG key (if available)
+        id: import_gpg
+        if: ${{ env.GPG_PRIVATE_KEY != '' }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "trust-model always" >> ~/.gnupg/gpg.conf
+          echo "imported=true" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Sign portable archive
+        if: steps.import_gpg.outputs.imported == 'true'
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          cd build/macos/Build/Products/Release
+          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --armor --detach-sign "PieNews-${{ inputs.version }}-MacOS.tar.gz"
+
+      - name: Generate checksums
+        run: |
+          cd build/macos/Build/Products/Release
+          shasum -a 256 PieNews-*.dmg PieNews-*.tar.gz > checksums.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: |
+            build/macos/Build/Products/Release/*.dmg
+            build/macos/Build/Products/Release/*.tar.gz
+            build/macos/Build/Products/Release/*.asc
+            build/macos/Build/Products/Release/checksums.txt

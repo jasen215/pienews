@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=PieNews
+Comment=A modern RSS reader built with Flutter
+Categories=Network;News;
+Icon=${SNAP}/usr/share/icons/hicolor/512x512/apps/pienews.png
+Exec=pienews %U
+Terminal=false
+StartupWMClass=pienews
+MimeType=application/x-opml;
+Keywords=rss;feed;reader;news;

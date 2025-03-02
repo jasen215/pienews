@@ -1,0 +1,5 @@
+[tools]
+flutter = "3.24"
+gradle = "8.5"
+java = "temurin-17"
+pnpm = "9"
